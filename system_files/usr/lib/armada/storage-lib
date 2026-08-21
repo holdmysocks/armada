@@ -32,19 +32,68 @@ armada_running_from_internal() {
     [[ "$root" == "$internal" ]]
 }
 
+_armada_external_disk_allowed() {
+    local disk_path="$1" include_usb="$2"
+    local disk node internal transport
+
+    disk="${disk_path##*/}"
+    node="/dev/${disk}"
+
+    # Native SD slots expose the card type in sysfs. Do not accept eMMC.
+    if [[ "$disk" =~ ^mmcblk[0-9]+$ && -r "$disk_path/device/type" ]]; then
+        [[ "$(<"$disk_path/device/type")" == SD ]] || return 1
+    elif (( include_usb )) &&
+         [[ "$disk" =~ ^sd[a-z]+$ || "$disk" =~ ^nvme[0-9]+n[0-9]+$ ]]; then
+        read -r transport < <(lsblk -dnro TRAN "$node" 2>/dev/null | head -1) || true
+        [[ "$transport" == usb ]] || return 1
+    else
+        return 1
+    fi
+
+    # Never return the internal UFS LUN, even if its kernel name looks like a
+    # USB disk or a bridge reports misleading transport metadata.
+    internal="${ARMADA_INTERNAL_DEVICE:-$(armada_internal_device || true)}"
+    if [[ -n "$internal" ]]; then
+        internal=$(readlink -f "$internal" 2>/dev/null || printf '%s\n' "$internal")
+        node=$(readlink -f "$node" 2>/dev/null || printf '%s\n' "$node")
+        [[ "$node" != "$internal" ]] || return 1
+    fi
+}
+
+# Return the parent disk when Armada is booted from an allowlisted external
+# recovery source. This is intentionally only a probe; installer policy can
+# consume it later without coupling detection to destructive behavior.
+armada_external_boot_device() {
+    local block_class="${ARMADA_BLOCK_CLASS:-/sys/class/block}"
+    local root disk
+
+    root=$(armada_root_device) || return 1
+    root=$(readlink -f "$root" 2>/dev/null || printf '%s\n' "$root")
+    disk="${root##*/}"
+    [[ -e "$block_class/$disk" ]] || return 1
+    _armada_external_disk_allowed "$block_class/$disk" 1 || return 1
+    printf '%s\n' "$root"
+}
+
 # Requires root so access can be checked as the session user with runuser.
-armada_mounted_sd() {
-    local disk_path disk node_path node target options
+_armada_mounted_media() {
+    local include_usb="$1"
+    local disk_path disk partition_glob node_path node target options
     local block_class="${ARMADA_BLOCK_CLASS:-/sys/class/block}"
     local media_root="${ARMADA_MEDIA_ROOT:-/run/media/armada}"
     local mounts=()
+    local -A seen=()
 
-    for disk_path in "$block_class"/mmcblk[0-9]*; do
-        [[ -r "$disk_path/device/type" ]] || continue
+    for disk_path in "$block_class"/*; do
+        [[ -e "$disk_path" ]] || continue
         disk="${disk_path##*/}"
-        [[ "$disk" =~ ^mmcblk[0-9]+$ ]] || continue
-        [[ "$(<"$disk_path/device/type")" == SD ]] || continue
-        for node_path in "$disk_path" "$block_class"/"$disk"p*; do
+        _armada_external_disk_allowed "$disk_path" "$include_usb" || continue
+        case "$disk" in
+            mmcblk[0-9]*|nvme[0-9]*n[0-9]*) partition_glob="${disk}p*" ;;
+            sd[a-z]*) partition_glob="${disk}[0-9]*" ;;
+            *) continue ;;
+        esac
+        for node_path in "$disk_path" "$block_class"/$partition_glob; do
             [[ -e "$node_path" ]] || continue
             node="/dev/${node_path##*/}"
             while IFS= read -r -d '' target && IFS= read -r -d '' options; do
@@ -55,7 +104,10 @@ armada_mounted_sd() {
                     *) continue ;;
                 esac
                 runuser -u armada -- test -r "$target" -a -w "$target" -a -x "$target" || continue
-                mounts+=("$target")
+                if [[ -z "${seen[$target]+x}" ]]; then
+                    mounts+=("$target")
+                    seen["$target"]=1
+                fi
             done < <(findmnt -J -S "$node" -o TARGET,OPTIONS 2>/dev/null \
                 | jq -j '.filesystems[]? | .target, "\u0000", .options, "\u0000"')
         done
@@ -63,4 +115,13 @@ armada_mounted_sd() {
 
     ((${#mounts[@]} == 1)) || return 1
     printf '%s\n' "${mounts[0]}"
+}
+
+armada_mounted_external() {
+    _armada_mounted_media 1
+}
+
+# Compatibility helper for existing callers that intentionally expose SD only.
+armada_mounted_sd() {
+    _armada_mounted_media 0
 }

@@ -7,7 +7,7 @@ function="$gadget/functions/ffs.mtp"
 ffs=/dev/ffs-mtp
 runtime=/run/armada-mtp
 role_state="$runtime/previous-role"
-sd_link="$runtime/sdcard"
+external_link="$runtime/external"
 source /usr/lib/armada/storage-lib
 
 unbind() {
@@ -58,10 +58,10 @@ case "${1:-}" in
         armada_uid="$(id -u armada)"
         armada_gid="$(id -g armada)"
         mount -t functionfs -o "rmode=0500,fmode=0600,uid=$armada_uid,gid=$armada_gid" mtp "$ffs"
-        sd_storage=0
+        external_storage=0
         # uMTP cannot escape quoted paths; realpath resolves this non-pinning link.
-        if armada_running_from_internal && sd_source=$(armada_mounted_sd) && ln -sfn -- "$sd_source" "$sd_link"; then
-            sd_storage=1
+        if armada_running_from_internal && external_source=$(armada_mounted_external) && ln -sfn -- "$external_source" "$external_link"; then
+            external_storage=1
         fi
         {
             # uMTP follows directory symlinks; non-hidden loops remain unsupported.
@@ -70,8 +70,8 @@ case "${1:-}" in
                 'show_hidden_files 0' \
                 'umask 022' \
                 'storage "/var/home/armada" "Home" "rw"'
-            if (( sd_storage )); then
-                printf '%s\n' 'storage "/run/armada-mtp/sdcard" "SD Card" "rw,removable"'
+            if (( external_storage )); then
+                printf '%s\n' 'storage "/run/armada-mtp/external" "External Storage" "rw,removable"'
             fi
             printf '%s\n' \
                 'manufacturer "Armada"' \
@@ -120,7 +120,7 @@ case "${1:-}" in
         ;;
     teardown)
         unbind
-        rm -f "$sd_link" || :
+        rm -f "$external_link" || :
         if mountpoint -q "$ffs"; then
             umount "$ffs" || :
         fi
