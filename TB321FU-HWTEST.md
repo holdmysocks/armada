@@ -3,7 +3,7 @@
 This branch is a private, disposable lab lane. It is not an Armada-supported
 device image, must not be submitted upstream, and must not be used to install
 Armada to internal storage. Automatic ABL updates and installer visibility are
-disabled deliberately.
+disabled deliberately. Generic ABL payloads are not packaged at all.
 
 The build must use the matching private kernel artifact containing:
 

@@ -20,6 +20,8 @@ test -s "${TB321FU_DTB}"
 test -s "${TOUCH_BLACKLIST}"
 grep -qx 'sm8650-lenovo-tb321fu' /usr/lib/armada/supported-dtbs
 grep -qx 'auto_update_enabled=0' /etc/armada/abl.conf
+test -f /usr/lib/armada/abl/TB321FU-HWTEST-NO-ABL
+! find /usr/lib/armada/abl -maxdepth 1 -type f -name 'abl_signed-*.elf' -print -quit | grep -q .
 grep -qx 'blacklist novatek-nt36523n' "${TOUCH_BLACKLIST}"
 test -s "${NO_ABL_DROPIN}"
 [[ "$(systemctl is-enabled armada-installer-visibility.service 2>/dev/null || true)" == masked ]]
