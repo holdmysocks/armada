@@ -7,6 +7,7 @@ KVER="$(ls /usr/lib/modules)"
 IMG="/usr/lib/modules/${KVER}/initramfs.img"
 HWTEST_MARKER=/usr/lib/armada/tb321fu-hwtest
 TOUCH_FIRMWARE=/usr/lib/firmware/qcom/sm8650/lenovo/tb321fu/novatek_ts_csot_fw.bin
+GPU_FIRMWARE=/usr/lib/firmware/qcom/sm8650/lenovo/tb321fu/gen70900_zap.mbn
 TOUCH_BLACKLIST=/usr/lib/modprobe.d/90-tb321fu-nt36523n-hwtest.conf
 TOUCH_MODULES="novatek-nt36523n novatek-nt36523n-report novatek-nt36523n-firmware"
 TB321FU_DTB="/usr/lib/modules/${KVER}/dtb/qcom/sm8650-lenovo-tb321fu.dtb"
@@ -36,9 +37,21 @@ dracut_args=(
     --add armada-ostree-fallback
 )
 touch_hwtest_ready=0
-if [[ -e "${TOUCH_FIRMWARE}" || -L "${TOUCH_FIRMWARE}" ]]; then
+touch_firmware_present=0
+gpu_firmware_present=0
+[[ -e "${TOUCH_FIRMWARE}" || -L "${TOUCH_FIRMWARE}" ]] && touch_firmware_present=1
+[[ -e "${GPU_FIRMWARE}" || -L "${GPU_FIRMWARE}" ]] && gpu_firmware_present=1
+[[ "${touch_firmware_present}" == "${gpu_firmware_present}" ]] || {
+    echo "ERROR: private TB321FU GPU and touchscreen firmware must be supplied together" >&2
+    exit 1
+}
+if [[ "${touch_firmware_present}" == 1 ]]; then
     [[ -f "${TOUCH_FIRMWARE}" && ! -L "${TOUCH_FIRMWARE}" && -s "${TOUCH_FIRMWARE}" ]] || {
         echo "ERROR: private NT36523N firmware must be a nonempty regular file: ${TOUCH_FIRMWARE}" >&2
+        exit 1
+    }
+    [[ -f "${GPU_FIRMWARE}" && ! -L "${GPU_FIRMWARE}" && -s "${GPU_FIRMWARE}" ]] || {
+        echo "ERROR: private TB321FU GPU zap must accompany touchscreen firmware: ${GPU_FIRMWARE}" >&2
         exit 1
     }
     for module in ${TOUCH_MODULES}; do
@@ -53,7 +66,7 @@ if [[ -e "${TOUCH_FIRMWARE}" || -L "${TOUCH_FIRMWARE}" ]]; then
     done
     dracut_args+=(
         --add-drivers "${TOUCH_MODULES}"
-        --install "${TOUCH_FIRMWARE} ${TOUCH_BLACKLIST}"
+        --install "${TOUCH_FIRMWARE} ${GPU_FIRMWARE} ${TOUCH_BLACKLIST}"
     )
     touch_hwtest_ready=1
 else
@@ -102,6 +115,10 @@ if [[ "${touch_hwtest_ready}" == 1 ]]; then
     done
     initrd_has 'usr/lib/firmware/qcom/sm8650/lenovo/tb321fu/novatek_ts_csot_fw[.]bin$' || {
         echo "ERROR: private NT36523N firmware missing from hardware-test initramfs" >&2
+        exit 1
+    }
+    initrd_has 'usr/lib/firmware/qcom/sm8650/lenovo/tb321fu/gen70900_zap[.]mbn$' || {
+        echo "ERROR: private TB321FU GPU zap missing from hardware-test initramfs" >&2
         exit 1
     }
     initrd_has 'usr/lib/modprobe[.]d/90-tb321fu-nt36523n-hwtest[.]conf$' || {

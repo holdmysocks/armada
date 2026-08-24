@@ -21,6 +21,10 @@ before building:
 
 `system_files/usr/lib/firmware/qcom/sm8650/lenovo/tb321fu/novatek_ts_csot_fw.bin`
 
+The same private profile must provide the TB321FU GPU zap at:
+
+`system_files/usr/lib/firmware/qcom/sm8650/lenovo/tb321fu/gen70900_zap.mbn`
+
 Do not add or commit that blob. If it is absent, the image still builds but the
 three touchscreen modules are explicitly omitted from the initramfs. If it is
 present, the build requires all three modules and verifies the firmware,
