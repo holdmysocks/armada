@@ -40,7 +40,7 @@ tar -xzf "${abl_archive}" -C "${abl_src}" --strip-components=1
 manifest=/usr/lib/armada/abl/manifest
 install -Dpm 0644 /dev/null "${manifest}"
 printf 'ARMADA_ABL_VERSION=%s\nARMADA_ABL_AUTO=%s\n' \
-    "${ARMADA_ABL_VERSION}" "${ARMADA_ABL_AUTO}" >> "${manifest}"
+    "${ARMADA_ABL_VERSION}" 0 >> "${manifest}"
 abl_version=${ARMADA_ABL_VERSION}
 for soc in SM8250 SM8550 SM8650 SM8750; do
     payload="/usr/lib/armada/abl/abl_signed-${soc}.elf"
@@ -78,7 +78,10 @@ systemctl enable inputplumber.service
 systemctl enable armada-guestos.service
 systemctl enable armada-device-quirks.service
 systemctl enable armada-fixups.service
-systemctl enable armada-installer-visibility.service
+# This disposable hardware-test image must never advertise the internal
+# installer. installer-visibility also checks the immutable lab marker in case
+# an operator starts the masked unit manually.
+systemctl mask armada-installer-visibility.service
 systemctl enable armada-steamapps.service
 systemctl enable armada-powerd.service
 systemctl enable armada-control.service

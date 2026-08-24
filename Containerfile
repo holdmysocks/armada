@@ -53,6 +53,10 @@ COPY system_files /system_files/
 FROM quay.io/fedora/fedora-bootc:44
 ARG ARMADA_VERSION=unknown
 LABEL org.opencontainers.image.version="${ARMADA_VERSION}"
+LABEL dev.armada.hwtest.device="lenovo-tb321fu" \
+      dev.armada.hwtest.purpose="nt36523n-manual-hardware-validation" \
+      dev.armada.hwtest.disposable="true" \
+      dev.armada.hwtest.upstream-supported="false"
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=bind,from=fex,source=/rpms,target=/packages/fex \

@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ -e /usr/lib/armada/tb321fu-hwtest ]]; then
+    rm -f /run/armada/installable
+    exit 0
+fi
+
 eval "$(/usr/libexec/armada/device-env)"
 source /usr/lib/armada/storage-lib
 
