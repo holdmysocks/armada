@@ -47,9 +47,14 @@ done
 CONTENT_ID=$(sudo bash -c "source '${ARMADA_LIB}/bootimg-args'; armada_bootimg_content_id '${KPATH}' '${IPATH}' ${_DTB_ARGS}")
 STAMP_ID=$(armada_bootimg_id "${LINUX_LINE}" "${INITRD_LINE}" "${OPTIONS_LINE}" "${DTB_LIST}" "${ARMADA_LIB}/bootimg-args" "${CONTENT_ID}")
 CMDLINE=$(armada_bootimg_cmdline "${OPTIONS_LINE}") || { echo "ERROR: no ostree= karg in ${BLS}"; exit 1; }
+DEBUG_SUFFIX="console=ttyMSM0,115200n8 ignore_loglevel loglevel=8 printk.time=1 systemd.show_status=1 rd.debug"
+CMDLINE_DEBUG="${CMDLINE} ${DEBUG_SUFFIX}"
 
 if [[ "${#CMDLINE}" -gt "${ARMADA_CMDLINE_MAX}" ]]; then
     echo "ERROR: cmdline is ${#CMDLINE}B, over the ${ARMADA_CMDLINE_MAX}B boot-header limit"; exit 1
+fi
+if [[ "${#CMDLINE_DEBUG}" -gt "${ARMADA_CMDLINE_MAX}" ]]; then
+    echo "ERROR: debug cmdline is ${#CMDLINE_DEBUG}B, over the ${ARMADA_CMDLINE_MAX}B boot-header limit"; exit 1
 fi
 
 # ROCKNIX ABL expects gzip(Image) with DTBs appended.
@@ -67,12 +72,20 @@ python3 "${MKBOOTIMG}" \
     ${ARMADA_BOOTIMG_ARGS} --os_patch_level "$(date '+%Y-%m')" \
     --cmdline "${CMDLINE}" \
     -o "${WORK}/KERNEL"
+python3 "${MKBOOTIMG}" \
+    --kernel "${WORK}/kernel.gz" --ramdisk "${WORK}/initramfs" \
+    ${ARMADA_BOOTIMG_ARGS} --os_patch_level "$(date '+%Y-%m')" \
+    --cmdline "${CMDLINE_DEBUG}" \
+    -o "${WORK}/KERNEL.DEBUG"
 
 sudo mount "${LOOP}p1" "${WORK}/p1"
 sudo cp "${WORK}/KERNEL" "${WORK}/p1/KERNEL"
+sudo cp "${WORK}/KERNEL.DEBUG" "${WORK}/p1/KERNEL.DEBUG"
 printf '%s' "${STAMP_ID}" | sudo tee "${WORK}/p1/.armada-bootimg.id" >/dev/null
 sudo sync
 
 echo "Staged /KERNEL ($(du -h "${WORK}/KERNEL" | cut -f1)) on the FAT partition of ${RAW}"
+echo "Staged /KERNEL.DEBUG ($(du -h "${WORK}/KERNEL.DEBUG" | cut -f1)) with verbose diagnostics"
 echo "deploy=${DEPLOY} kver=${KVER}"
 echo "cmdline=${CMDLINE}"
+echo "debug_cmdline=${CMDLINE_DEBUG}"

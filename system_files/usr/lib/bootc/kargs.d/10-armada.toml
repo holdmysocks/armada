@@ -6,6 +6,7 @@ kargs = [
     "console=tty0",
     "quiet",
     "loglevel=3",
+    "drm_client_lib.active=none",
 
     "allow_mismatched_32bit_el0",
     "fw_devlink.strict=1",
