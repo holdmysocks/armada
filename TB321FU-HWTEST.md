@@ -4,6 +4,9 @@ This branch is a private, disposable lab lane. It is not an Armada-supported
 device image, must not be submitted upstream, and must not be used to install
 Armada to internal storage. Automatic ABL updates and installer visibility are
 disabled deliberately. Generic ABL payloads are not packaged at all.
+The normal SD-card finalizer is hard-disabled because it would download those
+payloads and convert the external image to the shared Armada MBR layout. Build
+the GPT raw image and run only `post_process/make-bootimg.sh`.
 
 The build must use the matching private kernel artifact containing:
 

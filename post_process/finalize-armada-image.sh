@@ -8,6 +8,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/../abl/release.env"
 OUT="${OUT:-output/armada-$(TZ='America/New_York' date +%Y%m%d).img.gz}"
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
+if [[ -f "${REPO_ROOT}/TB321FU-HWTEST.md" ]]; then
+    echo "ERROR: the TB321FU lab lane must remain GPT and must not stage generic ABL payloads" >&2
+    echo "Use 'just build-raw', then post_process/make-bootimg.sh; do not run this finalizer." >&2
+    exit 2
+fi
+
 if [[ ! -f "${RAW_IMAGE}" ]]; then
     echo "ERROR: raw image not found at ${RAW_IMAGE}"
     echo "Run 'just build-raw' first."
